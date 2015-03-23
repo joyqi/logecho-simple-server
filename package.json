@@ -1,0 +1,32 @@
+{
+  "name": "logecho-simple-server",
+  "version": "1.0.0",
+  "description": "A simple http server for logecho",
+  "main": "build/server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "./bin/logechod"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joyqi/logecho-simple-server.git"
+  },
+  "keywords": [
+    "logecho"
+  ],
+  "bin": {
+    "logechod": "./bin/logechod"
+  },
+  "preferGlobal": true,
+  "author": "joyqi",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/joyqi/logecho-simple-server/issues"
+  },
+  "homepage": "https://github.com/joyqi/logecho-simple-server",
+  "dependencies": {
+    "jade": "^1.9.2",
+    "node-uuid": "^1.4.3",
+    "optimist": "^0.6.1"
+  }
+}
