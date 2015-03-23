@@ -4,6 +4,7 @@ url = require 'url'
 zlib = require 'zlib'
 uuid = require 'node-uuid'
 jade = require 'jade'
+winston = require 'winston'
 argv = require 'optimist'
     .default 'k', uuid.v4()
     .default 'h', '0.0.0.0'
@@ -14,6 +15,25 @@ argv = require 'optimist'
     .default '500', __dirname + '/../template/500.jade'
     .default '503', __dirname + '/../template/503.jade'
     .argv
+
+logger = new winston.Logger
+    transports: [
+        new winston.transports.Console
+            handleExceptions:   yes
+            level:              'info'
+            prettyPrint:        yes
+            colorize:           yes
+            timestamp:          yes
+    ]
+    exitOnError: no
+    levels:
+        info:   0
+        warn:   1
+        error:  3
+    colors:
+        info:   'green'
+        warn:   'yellow'
+        error:  'red'
 
 data = null
 
@@ -53,7 +73,7 @@ if not argv.p?
     argv.p = if argv.s? then 443 else 80
 
 
-decode = (buff) ->
+decode = (buff, ip) ->
     lines = buff.split "\n"
     newData = {}
 
@@ -77,7 +97,7 @@ decode = (buff) ->
             suffix: suffix
 
     data = newData
-    console.log '[' + (new Date().toISOString()) + '] publish success'
+    logger.info "Published contents form address #{ip}"
 
 
 respond = (str, req, res) ->
@@ -150,7 +170,7 @@ postHandler = (info, req, res) ->
 
         req.on 'end', ->
             respond 'OK', req, res
-            decode buff
+            decode buff, ip
     else
         respond 403, req, res
         retry[ip] = 0 if not retry[ip]?
@@ -185,6 +205,6 @@ setInterval ->
 server = http.createServer dispatcher
 module.exports = ->
     server.listen argv.p, argv.h
-    console.log "The secure key is: #{argv.k}"
-    console.log "Listening on #{argv.h}:#{argv.p}"
+    logger.info "The secure key is: #{argv.k}"
+    logger.info "Listening on #{argv.h}:#{argv.p}"
 
