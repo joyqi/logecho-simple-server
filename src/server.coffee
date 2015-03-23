@@ -1,5 +1,6 @@
 
 http = require 'http'
+https = require 'https'
 url = require 'url'
 zlib = require 'zlib'
 uuid = require 'node-uuid'
@@ -9,11 +10,14 @@ argv = require 'optimist'
     .default 'k', uuid.v4()
     .default 'h', '0.0.0.0'
     .default 'p', null
-    .default 's', null
     .default '404', __dirname + '/../template/404.jade'
     .default '403', __dirname + '/../template/403.jade'
     .default '500', __dirname + '/../template/500.jade'
     .default '503', __dirname + '/../template/503.jade'
+    .default 'prefer-host', null
+    .default 'http-to-https', null
+    .default 'https-key', null
+    .default 'https-cert', null
     .argv
 
 logger = new winston.Logger
@@ -36,6 +40,7 @@ logger = new winston.Logger
         error:  'red'
 
 data = null
+isSecure = argv['https-key']? and argv['https-cert']?
 
 message =
     403: 'Forbidden'
@@ -134,6 +139,19 @@ dispatcher = (req, res) ->
 
 
 getHandler = (info, req, res) ->
+    preferHost = argv['prefer-host']
+
+    if preferHost?
+        host = req.headers.host.split ':'
+        if preferHost.toLowerCase() isnt host[0].toLowerCase()
+            host[0] = preferHost
+            redirectUrl = if isSecure then 'https' else 'http'
+            redirectUrl += '://' + (host.join ':') + req.url
+
+            res.statusCode = 301
+            res.statusMessage = 'Moved Permanently'
+            res.setHeader 'Location', redirectUrl
+
     if not data?
         respond 503, req, res
         return
@@ -201,10 +219,28 @@ setInterval ->
             break
 , CHECK_INTERVAL
 
+if isSecure
+    options =
+        key: fs.readFileSync argv['https-key']
+        cert: fs.readFileSync argv['https-cert']
+    server = https.createServer options, dispatcher
+else
+    server = http.createServer dispatcher
 
-server = http.createServer dispatcher
 module.exports = ->
     server.listen argv.p, argv.h
     logger.info "The secure key is: #{argv.k}"
     logger.info "Listening on #{argv.h}:#{argv.p}"
+    logger.info "Http host is forcing to #{argv['prefer-host']}" if argv['prefer-host']?
+
+    redirectPort = argv['http-to-https']
+    if isSecure and redirectPort?
+        redirectPort = if redirectPort is 'yes' then 80 else redirectPort
+        
+        http.createServer (req, res) ->
+            redirectUrl = 'https://' + req.headers.host + req.url
+            
+            res.statusCode = 301
+            res.statusMessage = 'Moved Permanently'
+            res.setHeader 'Location', redirectUrl
 
