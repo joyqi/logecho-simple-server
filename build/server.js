@@ -17,7 +17,7 @@
 
   winston = require('winston');
 
-  argv = require('optimist')["default"]('k', uuid.v4())["default"]('h', '0.0.0.0')["default"]('p', null)["default"]('404', __dirname + '/../template/404.jade')["default"]('403', __dirname + '/../template/403.jade')["default"]('500', __dirname + '/../template/500.jade')["default"]('503', __dirname + '/../template/503.jade')["default"]('prefer-host', null)["default"]('http-to-https', null)["default"]('https-key', null)["default"]('https-cert', null).argv;
+  argv = require('optimist')["default"]('k', uuid.v4())["default"]('h', '0.0.0.0')["default"]('p', null)["default"]('404', __dirname + '/../template/404.jade')["default"]('403', __dirname + '/../template/403.jade')["default"]('500', __dirname + '/../template/500.jade')["default"]('503', __dirname + '/../template/503.jade')["default"]('prefer-host', null)["default"]('ip-address', null)["default"]('http-to-https', null)["default"]('https-key', null)["default"]('https-cert', null).argv;
 
   logger = new winston.Logger({
     transports: [
@@ -182,8 +182,11 @@
 
   postHandler = function(info, req, res) {
     var buff, ip, key;
-    ip = req.connection.remoteAddress;
     key = req.headers.authorization;
+    ip = req.connection.remoteAddress;
+    if (argv['ip-address'] != null) {
+      ip = req.headers[argv['ip-address'].toLowerCase()];
+    }
     if (__indexOf.call(denied, ip) >= 0 || (key == null)) {
       return respond(403, req, res);
     }

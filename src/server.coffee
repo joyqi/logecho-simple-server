@@ -15,6 +15,7 @@ argv = require 'optimist'
     .default '500', __dirname + '/../template/500.jade'
     .default '503', __dirname + '/../template/503.jade'
     .default 'prefer-host', null
+    .default 'ip-address', null
     .default 'http-to-https', null
     .default 'https-key', null
     .default 'https-cert', null
@@ -169,12 +170,14 @@ getHandler = (info, req, res) ->
 
 
 postHandler = (info, req, res) ->
-    ip = req.connection.remoteAddress
     key = req.headers.authorization
+    ip = req.connection.remoteAddress
+    
+    if argv['ip-address']?
+        ip = req.headers[argv['ip-address'].toLowerCase()]
     
     if ip in denied or not key?
         return respond 403, req, res
-        
 
     key = (new Buffer (key.split ' ')[1], 'base64'
         .toString()
@@ -229,6 +232,7 @@ else
 
 module.exports = ->
     server.listen argv.p, argv.h
+    
     logger.info "The secure key is: #{argv.k}"
     logger.info "Listening on #{argv.h}:#{argv.p}"
     logger.info "Http host is forcing to #{argv['prefer-host']}" if argv['prefer-host']?
