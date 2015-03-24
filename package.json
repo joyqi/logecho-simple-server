@@ -1,6 +1,6 @@
 {
   "name": "logecho-simple-server",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "A simple http server for logecho",
   "main": "build/server.js",
   "scripts": {
@@ -25,6 +25,7 @@
   },
   "homepage": "https://github.com/joyqi/logecho-simple-server",
   "dependencies": {
+    "MD5": "^1.2.1",
     "jade": "^1.9.2",
     "node-uuid": "^1.4.3",
     "optimist": "^0.6.1",

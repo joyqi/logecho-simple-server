@@ -3,13 +3,16 @@ http = require 'http'
 https = require 'https'
 url = require 'url'
 zlib = require 'zlib'
+pathInfo = require 'path'
 uuid = require 'node-uuid'
 jade = require 'jade'
 winston = require 'winston'
+md5 = require 'MD5'
 argv = require 'optimist'
     .default 'k', uuid.v4()
     .default 'h', '0.0.0.0'
     .default 'p', null
+    .default '200', __dirname + '/../template/200.jade'
     .default '404', __dirname + '/../template/404.jade'
     .default '403', __dirname + '/../template/403.jade'
     .default '500', __dirname + '/../template/500.jade'
@@ -19,6 +22,7 @@ argv = require 'optimist'
     .default 'http-to-https', null
     .default 'https-key', null
     .default 'https-cert', null
+    .default 'perform-resource', 'yes'
     .argv
 
 logger = new winston.Logger
@@ -44,6 +48,7 @@ data = null
 isSecure = argv['https-key']? and argv['https-cert']?
 
 message =
+    200: 'OK'
     403: 'Forbidden'
     404: 'Not Found'
     500: 'Internal Server Error'
@@ -71,46 +76,102 @@ mime =
 denied = []
 retry = {}
 pool = {}
-CHECK_INTERVAL = 3000
-RELEASE_INTERVAL = 5000
+CHECK_INTERVAL = 60000
+RELEASE_INTERVAL = 86400000
 
 
 if not argv.p?
     argv.p = if argv.s? then 443 else 80
 
 
+performResource = (path, str, type, hashes) ->
+    replace = (link) ->
+        return link if link.match /^[_a-z0-9-]+:/i or link.match /^\/\//
+
+        info = url.parse link
+        dir = pathInfo.dirname path
+        root = if path.match /^\./ then dir else ''
+        normalizedPath = pathInfo.normalize root + info.pathname
+
+        return link if not hashes[normalizedPath]?
+
+        hash = hashes[normalizedPath]
+        link = info.pathname + '?h=' + hash
+        link += info.hash if info.hash?
+        link
+
+    switch type
+        when 'text/html'
+            str = str.replace /<link([^>]+)href="([^"]+)"([^>]*)>/ig, (m, a, link, b) ->
+                link = replace link
+                "<link#{a}href=\"#{link}\"#{b}>"
+            str = str.replace /<img([^>]+)src="([^"]+)"([^>]*)>/ig, (m, a, link, b) ->
+                link = replace link
+                "<img#{a}src=\"#{link}\"#{b}>"
+        when 'text/css'
+            str = str.replace /url\(([^\)]+)\)/ig, (m, link) ->
+                link = replace link
+                "url(#{link})"
+        else
+            break
+    str
+
+
 decode = (buff, ip) ->
     lines = buff.split "\n"
     newData = {}
+    hashes = {}
 
     for line in lines
         [path, v] = line.split ' '
         str = new Buffer v, 'base64'
             .toString 'utf8'
         
-        parts = path.split '.'
-        ext = parts[parts.length - 1].toLowerCase()
-        type = if mime[ext] then mime[ext] else (if parts.length > 1 then 'text/plain' else 'application/octet-stream')
+        ext = (pathInfo.extname path).substring 1
+        type = if mime[ext] then mime[ext] else (if ext.length > 0 then 'text/plain' else 'application/octet-stream')
         suffix = null
 
         if type.match /^text\//
             suffix = '; charset=UTF-8'
 
+        if argv['perform-resource'] is 'yes'
+            hashes[path] = md5 v
+
         newData[path] =
             body: str
-            ext: ext
             type: type
             suffix: suffix
+            time: new Date().toUTCString()
+            cache: ext not in ['html', 'htm', 'xml', 'txt', 'text']
+
+    if argv['perform-resource'] is 'yes'
+        for path, item of newData
+            newData[path].body = performResource path, item.body, item.type, hashes
 
     data = newData
     logger.info "Published contents form address #{ip}"
 
 
-respond = (str, req, res) ->
-    if (Number str) is str
-        res.statusCode = str
-        res.statusMessage = message[str]
-        str = jade.renderFile argv[str + '']
+respond = (item, req, res) ->
+    body = null
+    cache = no
+
+    if item not instanceof Object
+        res.statusCode = item
+        res.statusMessage = message[item]
+        res.setHeader 'Content-Type', 'text/html; charset=UTF8'
+        body = jade.renderFile argv[item + '']
+    else
+        res.setHeader 'Content-Type', item.type + item.suffix
+        body = item.body
+        cache = item.cache
+
+    if cache
+        res.setHeader 'Cache-Control', 'max-age=259200'
+        res.setHeader 'Last-Modified', item.time
+    else
+        res.setHeader 'Cache-Control', 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0'
+        res.setHeader 'Pragma', 'no-cache'
 
     encoding = req.headers['accept-encoding']
     encoding = '' if not encoding
@@ -126,7 +187,7 @@ respond = (str, req, res) ->
         pipe = zlib.createGzip()
         pipe.pipe res
 
-    pipe.write str
+    pipe.write body
     pipe.end()
 
 
@@ -161,10 +222,7 @@ getHandler = (info, req, res) ->
     path += 'index.html' if path[path.length - 1] is '/'
 
     if data[path]?
-        item = data[path]
-
-        res.setHeader 'Content-Type', item.type + item.suffix
-        respond item.body, req, res
+        respond data[path], req, res
     else
         respond 404, req, res
 
@@ -190,7 +248,7 @@ postHandler = (info, req, res) ->
             buff += chunk.toString()
 
         req.on 'end', ->
-            respond 'OK', req, res
+            respond 200, req, res
             decode buff, ip
     else
         respond 403, req, res
