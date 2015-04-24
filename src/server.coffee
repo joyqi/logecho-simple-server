@@ -11,7 +11,7 @@ md5 = require 'MD5'
 argv = require 'optimist'
     .default 'k', uuid.v4()
     .default 'h', '0.0.0.0'
-    .default 'p', null
+    .default 'p', process.env.PORT or 7000
     .default '200', __dirname + '/../template/200.jade'
     .default '404', __dirname + '/../template/404.jade'
     .default '403', __dirname + '/../template/403.jade'
@@ -78,10 +78,6 @@ retry = {}
 pool = {}
 CHECK_INTERVAL = 60000
 RELEASE_INTERVAL = 86400000
-
-
-if not argv.p?
-    argv.p = if argv.s? then 443 else 80
 
 
 performResource = (path, str, type, hashes) ->

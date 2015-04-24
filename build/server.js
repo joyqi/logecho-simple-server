@@ -21,7 +21,7 @@
 
   md5 = require('MD5');
 
-  argv = require('optimist')["default"]('k', uuid.v4())["default"]('h', '0.0.0.0')["default"]('p', null)["default"]('200', __dirname + '/../template/200.jade')["default"]('404', __dirname + '/../template/404.jade')["default"]('403', __dirname + '/../template/403.jade')["default"]('500', __dirname + '/../template/500.jade')["default"]('503', __dirname + '/../template/503.jade')["default"]('prefer-host', null)["default"]('ip-address', null)["default"]('http-to-https', null)["default"]('https-key', null)["default"]('https-cert', null)["default"]('perform-resource', 'yes').argv;
+  argv = require('optimist')["default"]('k', uuid.v4())["default"]('h', '0.0.0.0')["default"]('p', process.env.PORT || 7000)["default"]('200', __dirname + '/../template/200.jade')["default"]('404', __dirname + '/../template/404.jade')["default"]('403', __dirname + '/../template/403.jade')["default"]('500', __dirname + '/../template/500.jade')["default"]('503', __dirname + '/../template/503.jade')["default"]('prefer-host', null)["default"]('ip-address', null)["default"]('http-to-https', null)["default"]('https-key', null)["default"]('https-cert', null)["default"]('perform-resource', 'yes').argv;
 
   logger = new winston.Logger({
     transports: [
@@ -87,10 +87,6 @@
   CHECK_INTERVAL = 60000;
 
   RELEASE_INTERVAL = 86400000;
-
-  if (argv.p == null) {
-    argv.p = argv.s != null ? 443 : 80;
-  }
 
   performResource = function(path, str, type, hashes) {
     var replace;
